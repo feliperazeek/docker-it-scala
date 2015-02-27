@@ -4,7 +4,7 @@ trait DockerCassandraService extends DockerKit {
 
   val DefaultCqlPort = 9042
 
-  val cassandraContainer = DockerContainer("spotify/cassandra")
+  val cassandraContainer = SingleDockerContainer("spotify/cassandra")
     .withPorts(DefaultCqlPort -> None)
     .withReadyChecker(DockerReadyChecker.LogLine(_.contains("Starting listening for CQL clients on")))
 

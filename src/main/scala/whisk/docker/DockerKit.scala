@@ -37,11 +37,11 @@ trait DockerKit {
   }
 
   def stopRmAll(): Future[Seq[DockerContainer]] =
-    Future.traverse(dockerContainers)(_.remove(force = true))
+    Future.traverse(dockerContainers.map(_.list).flatten)(_.remove(force = true))
 
   def pullImages(): Future[Seq[DockerContainer]] = {
     listImages().flatMap { images =>
-      val containersToPull = dockerContainers.filterNot { c =>
+      val containersToPull = dockerContainers.map(_.list).flatten.filterNot { c =>
         val cImage = if (c.image.contains(":")) c.image else c.image + ":latest"
         images(cImage)
       }
@@ -55,5 +55,4 @@ trait DockerKit {
         log.error(e.getMessage, e)
         c -> false
     }))
-
 }
