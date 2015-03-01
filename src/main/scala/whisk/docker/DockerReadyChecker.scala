@@ -7,7 +7,7 @@ import scala.concurrent.duration.FiniteDuration
 import scala.concurrent.{ TimeoutException, ExecutionContext, Future, Promise }
 import scala.io.Codec
 
-trait DockerReadyChecker extends (SingleDockerContainer => Future[Boolean]) {
+trait DockerReadyChecker extends (DockerContainer => Future[Boolean]) {
 
   def and(other: DockerReadyChecker)(implicit ec: ExecutionContext) = {
     val s = this
@@ -79,11 +79,11 @@ trait DockerReadyChecker extends (SingleDockerContainer => Future[Boolean]) {
 object DockerReadyChecker {
 
   object Always extends DockerReadyChecker {
-    override def apply(container: SingleDockerContainer): Future[Boolean] = Future.successful(true)
+    override def apply(container: DockerContainer): Future[Boolean] = Future.successful(true)
   }
 
   case class HttpResponseCode(port: Int, path: String = "/", host: Option[String] = None, code: Int = 200)(implicit docker: Docker, ec: ExecutionContext) extends DockerReadyChecker {
-    override def apply(container: SingleDockerContainer): Future[Boolean] = {
+    override def apply(container: DockerContainer): Future[Boolean] = {
       container.getPorts().map(_(port)).flatMap { p =>
         val url = new URL("http", host.getOrElse(docker.host), p, path)
         Future {
@@ -100,7 +100,7 @@ object DockerReadyChecker {
   }
 
   case class LogLine(check: String => Boolean)(implicit docker: Docker, ec: ExecutionContext) extends DockerReadyChecker {
-    override def apply(container: SingleDockerContainer) = {
+    override def apply(container: DockerContainer) = {
       @tailrec
       def pullAndCheck(it: Iterator[String]): Boolean = it.hasNext match {
         case true =>
@@ -115,7 +115,7 @@ object DockerReadyChecker {
     }
   }
 
-  case class F(f: SingleDockerContainer => Future[Boolean]) extends DockerReadyChecker {
-    override def apply(container: SingleDockerContainer): Future[Boolean] = f(container)
+  case class F(f: DockerContainer => Future[Boolean]) extends DockerReadyChecker {
+    override def apply(container: DockerContainer): Future[Boolean] = f(container)
   }
 }

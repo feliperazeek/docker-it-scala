@@ -37,11 +37,12 @@ trait DockerKit {
   }
 
   def stopRmAll(): Future[Seq[DockerContainer]] =
-    Future.traverse(dockerContainers.map(_.list).flatten)(_.remove(force = true))
+    // TODO improve the order of containers to shutdown
+    Future.traverse(dockerContainers)(_.remove(force = true))
 
   def pullImages(): Future[Seq[DockerContainer]] = {
     listImages().flatMap { images =>
-      val containersToPull = dockerContainers.map(_.list).flatten.filterNot { c =>
+      val containersToPull = dockerContainers.filterNot { c =>
         val cImage = if (c.image.contains(":")) c.image else c.image + ":latest"
         images(cImage)
       }
@@ -49,8 +50,24 @@ trait DockerKit {
     }
   }
 
-  def initReadyAll(): Future[Seq[(DockerContainer, Boolean)]] =
-    Future.traverse(dockerContainers)(_.init()).flatMap(Future.traverse(_)(c => c.isReady().map(c -> _).recover {
+  def initReadyAll(): Future[Seq[(DockerContainer, Boolean)]] = {
+    // TODO improve this by defining the right order and concurrency for containers to get initialized
+    for {
+      (childs, parents) <- Future successful dockerContainers.partition(_.hasDependency)
+
+      // Init containers that don't have any dependency
+      p <- initReadyAll(parents)
+
+      // Init containers that have dependencies
+      c <- initReadyAll(childs)
+
+      results <- Future successful (p ::: c)
+
+    } yield results
+  }
+
+  private[this] def initReadyAll(containers: List[DockerContainer]) =
+    Future.traverse(containers)(_.init()).flatMap(Future.traverse(_)(c => c.isReady().map(c -> _).recover {
       case e =>
         log.error(e.getMessage, e)
         c -> false

@@ -12,7 +12,7 @@ import scala.collection.JavaConversions._
 import scala.concurrent.{ ExecutionContext, Future, Promise }
 
 trait DockerContainerOps {
-  self: SingleDockerContainer =>
+  self: DockerContainer =>
 
   private lazy val log = LoggerFactory.getLogger(this.getClass)
 

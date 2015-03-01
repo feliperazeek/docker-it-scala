@@ -6,12 +6,12 @@ import org.scalatest.{ GivenWhenThen, BeforeAndAfterAll, Matchers, FlatSpec }
 import whisk.docker.test.DockerTestKit
 
 class KafkaServiceSpec extends FlatSpec with Matchers with BeforeAndAfterAll with GivenWhenThen with ScalaFutures
-    with DockerKafkaService with DockerTestKit {
+    with DockerZooKeeperService with DockerKafkaService with DockerTestKit {
 
   implicit val pc = PatienceConfig(Span(30, Seconds), Span(2, Seconds))
 
   "all containers" should "be ready at the same time" in {
-    dockerContainers.map(_.list).flatten.map(_.image).foreach(println)
-    dockerContainers.map(_.list).flatten.forall(_.isReady().futureValue) shouldBe true
+    dockerContainers.map(_.image).foreach(println)
+    dockerContainers.forall(_.isReady().futureValue) shouldBe true
   }
 }

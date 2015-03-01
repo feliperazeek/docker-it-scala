@@ -11,7 +11,7 @@ class AllAtOnceSpec extends FlatSpec with Matchers with BeforeAndAfterAll with G
   implicit val pc = PatienceConfig(Span(20, Seconds), Span(1, Second))
 
   "all containers" should "be ready at the same time" in {
-    dockerContainers.map(_.list).flatten.map(_.image).foreach(println)
-    dockerContainers.map(_.list).flatten.forall(_.isReady().futureValue) shouldBe true
+    dockerContainers.map(_.image).foreach(println)
+    dockerContainers.forall(_.isReady().futureValue) shouldBe true
   }
 }

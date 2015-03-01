@@ -5,56 +5,7 @@ import com.github.dockerjava.api.model.{ ExposedPort, Ports, Link }
 import scala.concurrent.{ Future, ExecutionContext }
 import org.slf4j.LoggerFactory
 
-trait DockerContainer {
-
-  def init()(implicit docker: Docker, ec: ExecutionContext): Future[DockerContainer]
-  def isReady()(implicit docker: Docker, ec: ExecutionContext): Future[Boolean]
-  def list(): Seq[SingleDockerContainer]
-}
-
-case class LinkedContainers(containers: SingleDockerContainer*) extends DockerContainer {
-
-  private lazy val log = LoggerFactory.getLogger(this.getClass)
-
-  private def withContainers[T](f: (SingleDockerContainer) => Future[T])(implicit ec: ExecutionContext): Future[List[T]] = {
-    serialiseFutures(containers) { c =>
-      f(c)
-    }
-  }
-
-  def init()(implicit docker: Docker, ec: ExecutionContext): Future[DockerContainer] = {
-    withContainers { container =>
-      for {
-        _ <- Future successful log.debug("-- Container: " + container)
-        c <- container.init()
-        ready <- container.isReady()
-        _ <- Future successful log.debug("-- Ready: " + ready)
-      } yield c
-    } map (_.last)
-  }
-
-  def isReady()(implicit docker: Docker, ec: ExecutionContext): Future[Boolean] = {
-    withContainers { container =>
-      container.isReady()
-    } map { values =>
-      !(values contains false)
-    }
-  }
-
-  def list() = containers
-
-  def serialiseFutures[A, B](l: Iterable[A])(fn: A ⇒ Future[B])(implicit ec: ExecutionContext): Future[List[B]] =
-    l.foldLeft(Future(List.empty[B])) {
-      (previousFuture, next) ⇒
-        for {
-          previousResults ← previousFuture
-          next ← fn(next)
-        } yield previousResults :+ next
-    }
-
-}
-
-case class SingleDockerContainer(
+case class DockerContainer(
     image: String,
     command: Option[Seq[String]] = None,
     bindPorts: Map[Int, Option[Int]] = Map.empty,
@@ -64,9 +15,8 @@ case class SingleDockerContainer(
     name: Option[String] = None,
     links: Seq[Link] = Nil,
     withPublishAllPorts: Boolean = true,
-    networkMode: String = "bridge") extends DockerContainer with DockerContainerOps {
-
-  def list() = Seq(this)
+    networkMode: String = "bridge",
+    dependencies: Seq[DockerContainer] = Nil) extends DockerContainerOps {
 
   def withCommand(cmd: String*) = copy(command = Some(cmd))
 
@@ -79,6 +29,10 @@ case class SingleDockerContainer(
   def withLinks(value: Link*) = copy(links = value)
 
   def withReadyChecker(checker: DockerReadyChecker) = copy(readyChecker = checker)
+
+  def dependsOn(value: DockerContainer*) = copy(dependencies = value)
+
+  val hasDependency: Boolean = !(dependencies.isEmpty)
 
   private[docker] def prepareCreateCmd(cmd: CreateContainerCmd): CreateContainerCmd = {
     val c = command
